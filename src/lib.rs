@@ -11,17 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use autocxx::prelude::*; // use all the main autocxx functions
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+include_cpp! {
+    #include "vsomeip/vsomeip.hpp"
+    safety!(unsafe) // see details of unsafety policies described in the 'safety' section of the book
+    // generate!("vsomeip_v3::runtime") // add this line for each function or type you wish to generate
+    generate!("vsomeip_v3::message_t") // add this line for each function or type you wish to generate
 }

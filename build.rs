@@ -28,10 +28,15 @@ fn main() -> miette::Result<()> {
         .expect("Unable to download released archive");
     decompress::decompress(
         vsomeip_archive_dest,
-        vsomeip_decompressed_folder,
+        vsomeip_decompressed_folder.clone(),
         &ExtractOptsBuilder::default().strip(1).build().unwrap(),
     )
     .expect("Unable to extract tar.gz");
+
+    let interface_path = vsomeip_decompressed_folder.join("interface"); // include path
+    let mut b = autocxx_build::Builder::new("src/lib.rs", &[&interface_path]).build()?;
+    b.flag_if_supported("-std=c++17").compile("autocxx-demo"); // arbitrary library name, pick anything
+    println!("cargo:rerun-if-changed=src/lib.rs");
 
     Ok(())
 }
