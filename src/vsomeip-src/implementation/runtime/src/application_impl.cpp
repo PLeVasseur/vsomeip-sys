@@ -82,7 +82,7 @@ application_impl::application_impl(const std::string &_name, const std::string &
 }
 
 application_impl::~application_impl() {
-    runtime_->remove_application(name_);
+//    runtime_->remove_application(name_);
     try {
         if (stop_thread_.joinable()) {
             stop_thread_.detach();

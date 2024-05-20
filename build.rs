@@ -35,6 +35,10 @@ fn main() -> miette::Result<()> {
 
     // let interface_path = vsomeip_decompressed_folder.join("interface"); // include path
     let interface_path = Path::new("src").join("vsomeip-src").join("interface");
+    // for some reason unless we explicitly provide paths to headers for the stdlib here we have issues
+    // I don't think we should really _have_ to do this though, as their locations are
+    // more or less consistent on every instance of the different platforms
+    // reference: https://github.com/google/autocxx/issues/1347#issuecomment-1928551787
     let mut b = autocxx_build::Builder::new("src/lib.rs", &[&interface_path])
         .extra_clang_args(&[
             "-I/usr/include/c++/11",
@@ -43,6 +47,8 @@ fn main() -> miette::Result<()> {
         .build()?;
     b.flag_if_supported("-std=c++17").compile("autocxx-demo"); // arbitrary library name, pick anything
     println!("cargo:rerun-if-changed=src/lib.rs");
+    println!("cargo:rustc-link-lib=vsomeip3");
+    println!("cargo:rustc-link-search=native=/usr/local/lib");
 
     Ok(())
 }

@@ -26,8 +26,8 @@ void runtime_impl::set_property(const std::string &_name, const std::string &_va
 }
 
 std::unique_ptr<runtime> runtime_impl::get() {
-    static std::shared_ptr<runtime> the_runtime_ = std::make_shared<runtime_impl>();
-    return the_runtime_;
+    static std::unique_ptr<runtime> the_runtime_ = std::make_unique<runtime_impl>();
+    return std::move(the_runtime_);
 }
 
 runtime_impl::~runtime_impl() {
@@ -43,7 +43,7 @@ std::unique_ptr<application> runtime_impl::create_application(
         const std::string &_name, const std::string &_path) {
 //    static std::uint32_t postfix_id = 0;
 //    std::lock_guard<std::mutex> its_lock(applications_mutex_);
-//    std::string its_name = _name;
+    std::string its_name = _name;
 //    auto found_application = applications_.find(_name);
 //    if( found_application != applications_.end()) {
 //        its_name += "_" + std::to_string(postfix_id++);
