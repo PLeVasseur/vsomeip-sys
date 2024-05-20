@@ -35,7 +35,12 @@ fn main() -> miette::Result<()> {
 
     // let interface_path = vsomeip_decompressed_folder.join("interface"); // include path
     let interface_path = Path::new("src").join("vsomeip-src").join("interface");
-    let mut b = autocxx_build::Builder::new("src/lib.rs", &[&interface_path]).build()?;
+    let mut b = autocxx_build::Builder::new("src/lib.rs", &[&interface_path])
+        .extra_clang_args(&[
+            "-I/usr/include/c++/11",
+            "-I/usr/include/x86_64-linux-gnu/c++/11",
+        ])
+        .build()?;
     b.flag_if_supported("-std=c++17").compile("autocxx-demo"); // arbitrary library name, pick anything
     println!("cargo:rerun-if-changed=src/lib.rs");
 
