@@ -33,7 +33,8 @@ fn main() -> miette::Result<()> {
     )
     .expect("Unable to extract tar.gz");
 
-    let interface_path = vsomeip_decompressed_folder.join("interface"); // include path
+    // let interface_path = vsomeip_decompressed_folder.join("interface"); // include path
+    let interface_path = Path::new("src").join("vsomeip-src").join("interface");
     let mut b = autocxx_build::Builder::new("src/lib.rs", &[&interface_path]).build()?;
     b.flag_if_supported("-std=c++17").compile("autocxx-demo"); // arbitrary library name, pick anything
     println!("cargo:rerun-if-changed=src/lib.rs");
@@ -46,7 +47,7 @@ fn main() -> miette::Result<()> {
 fn download_and_write_file(
     url: &str,
     dest_path: &PathBuf,
-) -> core::result::Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     // Send a GET request to the URL
     match reqwest::blocking::get(url) {
         Ok(mut response) => {
