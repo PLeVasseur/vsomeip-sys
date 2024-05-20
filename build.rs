@@ -24,6 +24,9 @@ fn main() -> miette::Result<()> {
     let vsomeip_decompressed_folder = Path::new(&out_dir).join("vsomeip").join("vsomeip-src");
     let vsomeip_archive_url = format!("{VSOMEIP_TAGGED_RELEASE_BASE}{VSOMEIP_VERSION_ARCHIVE}");
 
+    let project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let runtime_wrapper_dir = project_root.join("src/wrappers/include"); // Update the path as necessary
+
     download_and_write_file(&*vsomeip_archive_url, &vsomeip_archive_dest)
         .expect("Unable to download released archive");
     decompress::decompress(
@@ -33,19 +36,19 @@ fn main() -> miette::Result<()> {
     )
     .expect("Unable to extract tar.gz");
 
-    // let interface_path = vsomeip_decompressed_folder.join("interface"); // include path
-    let interface_path = Path::new("src").join("vsomeip-src").join("interface");
+    // let interface_path = Path::new("src").join("vsomeip-src").join("interface");
+    let interface_path = vsomeip_decompressed_folder.join("interface");
     // for some reason unless we explicitly provide paths to headers for the stdlib here we have issues
     // I don't think we should really _have_ to do this though, as their locations are
     // more or less consistent on every instance of the different platforms
     // reference: https://github.com/google/autocxx/issues/1347#issuecomment-1928551787
-    let mut b = autocxx_build::Builder::new("src/lib.rs", &[&interface_path])
+    let mut b = autocxx_build::Builder::new("src/lib.rs", &[&interface_path, &runtime_wrapper_dir])
         .extra_clang_args(&[
             "-I/usr/include/c++/11",
             "-I/usr/include/x86_64-linux-gnu/c++/11",
         ])
         .build()?;
-    b.flag_if_supported("-std=c++17").compile("autocxx-demo"); // arbitrary library name, pick anything
+    b.flag_if_supported("-std=c++17").compile("vsomeip-sys"); // arbitrary library name, pick anything
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rustc-link-lib=vsomeip3");
     println!("cargo:rustc-link-search=native=/usr/local/lib");
