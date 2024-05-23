@@ -22,6 +22,8 @@ include_cpp! {
     generate!("vsomeip_v3::runtime") // add this line for each function or type you wish to generate
     generate!("vsomeip_v3::application")
     generate!("vsomeip_v3::message_t") // add this line for each function or type you wish to generate
+    generate!("vsomeip_v3::ANY_MAJOR")
+    generate!("vsomeip_v3::ANY_MINOR")
     generate!("RuntimeWrapper")
     generate!("make_runtime_wrapper")
     generate!("ApplicationWrapper")
