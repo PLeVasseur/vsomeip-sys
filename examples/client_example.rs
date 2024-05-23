@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use vsomeip_sys::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper};
+use vsomeip_sys::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper, set_data_safe, get_pinned_message};
 use vsomeip_sys::vsomeip::{application, message, message_base, runtime};
 use vsomeip_sys::AvailabilityHandlerFnPtr;
 
@@ -118,7 +118,13 @@ fn main() {
     get_pinned_message_base(&request).set_method(SAMPLE_METHOD_ID);
 
     let payload_wrapper = make_payload_wrapper(get_pinned_runtime(&runtime_wrapper).create_payload());
-    // get_pinned_payload(payload_wrapper)
+
+    let mut payload_data: Vec<u8> = Vec::new();
+    for i in 0..10 {
+        payload_data.push((i as u16 % 256) as u8);
+    }
+
+    set_data_safe(get_pinned_payload(&payload_wrapper), Box::from(payload_data));
 
     let shared_ptr_message = request.as_ref().unwrap().get_shared_ptr();
     println!("attempting send...");

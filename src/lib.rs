@@ -35,6 +35,9 @@ include_cpp! {
     generate!("upcast")
     generate!("PayloadWrapper")
     generate!("make_payload_wrapper")
+    generate!("set_payload_raw")
+    generate!("get_payload_raw")
+    generate!("create_payload_wrapper")
     // generate!("return_availability_handler")
     // generate!("vsomeip_v3::availability_handler_fn_ptr")
     // generate!("fake_availability_state_handler_fn")
@@ -84,6 +87,17 @@ mod foo {
         ) -> *const u8;
 
         pub fn get_length(self: &payload) -> u32;
+
+        // type SharedPtr<T> = crate::SharedPtr<T>;
+        type message = crate::vsomeip::message;
+        // pub fn set_payload(
+        //     self: Pin<&mut message>,
+        //
+        //     // _payload:SharedPtr<payload>
+        // );
+
+        // fn get_payload(self: &message) -> SharedPtr<payload>;
+        // fn set_payload(self: &message, payload: SharedPtr<payload>);
     }
 }
 
@@ -115,15 +129,21 @@ pub mod vsomeip {
     pub use crate::ffi::vsomeip_v3::*;
 }
 
+pub mod reexports {
+    pub use cxx::SharedPtr;
+}
+
 pub mod pinned {
     use std::cell::UnsafeCell;
     use crate::ffi::vsomeip_v3::{application, message, runtime, payload};
     pub use crate::ffi::{
         make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper, ApplicationWrapper,
-        MessageWrapper, RuntimeWrapper, PayloadWrapper
+        MessageWrapper, RuntimeWrapper, PayloadWrapper, create_payload_wrapper
     };
     use std::pin::Pin;
     use std::slice;
+    use cxx::UniquePtr;
+    use crate::ffi::{get_payload_raw, set_payload_raw};
     pub use crate::ffi::upcast;
     use crate::vsomeip::message_base;
 
@@ -201,18 +221,89 @@ pub mod pinned {
 
         data_vec
     }
+
+    pub fn set_message_payload(message_wrapper: &mut UniquePtr<MessageWrapper>, payload_wrapper: &mut UniquePtr<PayloadWrapper>) {
+        unsafe {
+            let message_pin = Pin::new_unchecked(&mut *message_wrapper);
+            let payload_pin = Pin::new_unchecked(&mut *payload_wrapper);
+            let message_ptr = MessageWrapper::get_mut(&**message_pin);
+            let payload_ptr = PayloadWrapper::get_mut(&**payload_pin);
+            set_payload_raw(message_ptr, payload_ptr);
+        }
+    }
+
+    pub fn get_message_payload(
+        message_wrapper: &mut UniquePtr<MessageWrapper>,
+    ) -> UniquePtr<PayloadWrapper> {
+        unsafe {
+            if message_wrapper.is_null() {
+                eprintln!("message_wrapper is null");
+                return cxx::UniquePtr::null();
+            }
+
+            let message_pin = Pin::new_unchecked(message_wrapper.as_mut().unwrap());
+            let message_ptr = MessageWrapper::get_mut(&*message_pin) as *const message;
+
+            if (message_ptr as *const ()).is_null() {
+                eprintln!("message_ptr is null");
+                return UniquePtr::null();
+            }
+
+            let payload_ptr = get_payload_raw(message_ptr);
+
+            if (payload_ptr as *const ()).is_null() {
+                eprintln!("payload_ptr is null");
+                return UniquePtr::null();
+            }
+
+            println!("get_message_payload: payload_ptr = {:?}", payload_ptr);
+
+            // Use the intermediate function to create a UniquePtr<PayloadWrapper>
+            let payload_wrapper = create_payload_wrapper(payload_ptr);
+
+            if payload_wrapper.is_null() {
+                eprintln!("Failed to create UniquePtr<PayloadWrapper>");
+            } else {
+                println!("Successfully created UniquePtr<PayloadWrapper>");
+            }
+
+            payload_wrapper
+        }
+    }
+
+    // pub fn get_message_payload(
+    //     message_wrapper: &mut UniquePtr<MessageWrapper>,
+    // ) -> UniquePtr<PayloadWrapper> {
+    //     unsafe {
+    //         let message_pin = Pin::new_unchecked(message_wrapper.as_mut().unwrap());
+    //         let message_ptr = MessageWrapper::get_mut(&*message_pin) as *const _;
+    //         let payload_ptr = get_payload_raw(message_ptr);
+    //
+    //         // Assuming you have a way to create a UniquePtr<PayloadWrapper> from the raw pointer
+    //         UniquePtr::from_raw(payload_ptr as *mut PayloadWrapper)
+    //     }
+    //
+    //     // unsafe {
+    //     //     let message_pin = Pin::new_unchecked(&mut *message_wrapper);
+    //     //     let message_ptr = MessageWrapper::get_mut(&**message_pin);
+    //     //     let payload_ptr = get_payload_raw(message_ptr as *const _);
+    //     //     // Assuming you have a way to create a UniquePtr<PayloadWrapper> from the raw pointer
+    //     //     UniquePtr::from_raw(payload_ptr as *mut PayloadWrapper)
+    //     // }
+    // }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ffi::vsomeip_v3::runtime;
     use crate::ffi::{make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper};
-    use crate::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, upcast, set_data_safe, get_data_safe};
+    use crate::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, upcast, set_data_safe, get_data_safe, set_message_payload, get_message_payload};
     use crate::vsomeip::{message, message_base};
     use crate::{ffi, vsomeip, AvailabilityHandlerFnPtr};
     use cxx::let_cxx_string;
     use std::pin::Pin;
     use std::slice;
+    use std::time::Duration;
 
     #[test]
     fn test_make_runtime() {
@@ -241,36 +332,30 @@ mod tests {
 
         println!("reliable? {reliable}");
 
-        let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
+        let mut request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
         get_pinned_message_base(&request).set_service(1);
         get_pinned_message_base(&request).set_instance(2);
         get_pinned_message_base(&request).set_method(3);
 
-        let payload_wrapper = make_payload_wrapper(get_pinned_runtime(&runtime_wrapper).create_payload());
+        let mut payload_wrapper = make_payload_wrapper(get_pinned_runtime(&runtime_wrapper).create_payload());
         let foo = get_pinned_payload(&payload_wrapper);
 
         // Data to be passed to set_data
         let data: Vec<u8> = vec![1, 2, 3, 4, 5];
 
-        // Get the length of the data
-        let length = data.len() as u32;
-
-        // Get a pointer to the data
-        let data_ptr = data.as_ptr();
-
         set_data_safe(get_pinned_payload(&payload_wrapper), Box::from(data));
 
         let data_vec = get_data_safe(&payload_wrapper);
-
-        // let retrieved_data_ptr = get_pinned_payload(&payload_wrapper).get_data();
-        //
-        // // Convert the raw pointer and length to a slice
-        // let data_slice: &[u8] = unsafe { slice::from_raw_parts(retrieved_data_ptr, length as usize) };
-        //
-        // // Convert the slice to a Vec
-        // let data_vec: Vec<u8> = data_slice.to_vec();
-
-        // Print the data
         println!("{:?}", data_vec);
+
+        set_message_payload(&mut request, &mut payload_wrapper);
+
+        println!("set_message_payload");
+
+        let payload = get_message_payload(&mut request);
+
+        println!("get_message_payload");
+
+        std::thread::sleep(Duration::from_millis(2000));
     }
 }
