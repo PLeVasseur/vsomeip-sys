@@ -2228,7 +2228,9 @@ dependencies = [
  "autocxx-build",
  "cxx",
  "decompress",
+ "lazy_static",
  "miette",
+ "once_cell",
  "reqwest",
 ]
 
