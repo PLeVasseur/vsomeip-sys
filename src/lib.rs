@@ -82,6 +82,8 @@ mod foo {
         pub fn get_data(
             self: &payload,
         ) -> *const u8;
+
+        pub fn get_length(self: &payload) -> u32;
     }
 }
 
@@ -121,6 +123,7 @@ pub mod pinned {
         MessageWrapper, RuntimeWrapper, PayloadWrapper
     };
     use std::pin::Pin;
+    use std::slice;
     pub use crate::ffi::upcast;
     use crate::vsomeip::message_base;
 
@@ -182,13 +185,29 @@ pub mod pinned {
 
         unsafe { payload.set_data(data_ptr, length); }
     }
+
+    pub fn get_data_safe(
+        payload_wrapper: &PayloadWrapper
+    ) -> Vec<u8> {
+
+        let length = get_pinned_payload(&payload_wrapper).get_length();
+        let data_ptr = get_pinned_payload(&payload_wrapper).get_data();
+
+        // Convert the raw pointer and length to a slice
+        let data_slice: &[u8] = unsafe { slice::from_raw_parts(data_ptr, length as usize) };
+
+        // Convert the slice to a Vec
+        let data_vec: Vec<u8> = data_slice.to_vec();
+
+        data_vec
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ffi::vsomeip_v3::runtime;
     use crate::ffi::{make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper};
-    use crate::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, upcast, set_data_safe};
+    use crate::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, upcast, set_data_safe, get_data_safe};
     use crate::vsomeip::{message, message_base};
     use crate::{ffi, vsomeip, AvailabilityHandlerFnPtr};
     use cxx::let_cxx_string;
@@ -241,13 +260,15 @@ mod tests {
 
         set_data_safe(get_pinned_payload(&payload_wrapper), Box::from(data));
 
-        let retrieved_data_ptr = get_pinned_payload(&payload_wrapper).get_data();
+        let data_vec = get_data_safe(&payload_wrapper);
 
-        // Convert the raw pointer and length to a slice
-        let data_slice: &[u8] = unsafe { slice::from_raw_parts(retrieved_data_ptr, length as usize) };
-
-        // Convert the slice to a Vec
-        let data_vec: Vec<u8> = data_slice.to_vec();
+        // let retrieved_data_ptr = get_pinned_payload(&payload_wrapper).get_data();
+        //
+        // // Convert the raw pointer and length to a slice
+        // let data_slice: &[u8] = unsafe { slice::from_raw_parts(retrieved_data_ptr, length as usize) };
+        //
+        // // Convert the slice to a Vec
+        // let data_vec: Vec<u8> = data_slice.to_vec();
 
         // Print the data
         println!("{:?}", data_vec);
