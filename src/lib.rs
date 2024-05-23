@@ -169,13 +169,26 @@ pub mod pinned {
     pub fn get_pinned_payload(wrapper: &PayloadWrapper) -> Pin<&mut payload> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
     }
+
+    pub fn set_data_safe(
+        payload: Pin<&mut payload>,
+        _data: Box<[u8]>,
+    ) {
+        // Get the length of the data
+        let length = _data.len() as u32;
+
+        // Get a pointer to the data
+        let data_ptr = _data.as_ptr();
+
+        unsafe { payload.set_data(data_ptr, length); }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ffi::vsomeip_v3::runtime;
     use crate::ffi::{make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper};
-    use crate::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, upcast};
+    use crate::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, upcast, set_data_safe};
     use crate::vsomeip::{message, message_base};
     use crate::{ffi, vsomeip, AvailabilityHandlerFnPtr};
     use cxx::let_cxx_string;
@@ -226,7 +239,7 @@ mod tests {
         // Get a pointer to the data
         let data_ptr = data.as_ptr();
 
-        unsafe { foo.set_data(data_ptr, length); }
+        set_data_safe(get_pinned_payload(&payload_wrapper), Box::from(data));
 
         let retrieved_data_ptr = get_pinned_payload(&payload_wrapper).get_data();
 
