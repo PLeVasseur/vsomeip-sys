@@ -5,10 +5,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use vsomeip_sys::pinned::{
-    get_pinned_application, get_pinned_message, get_pinned_runtime, make_application_wrapper,
-    make_message_wrapper, make_runtime_wrapper, upcast,
-};
+use vsomeip_sys::pinned::{get_pinned_application, get_pinned_message, get_pinned_message_base, get_pinned_runtime, make_application_wrapper, make_message_wrapper, make_runtime_wrapper, upcast};
 use vsomeip_sys::vsomeip::{application, message, message_base, runtime};
 use vsomeip_sys::AvailabilityHandlerFnPtr;
 
@@ -116,20 +113,20 @@ fn main() {
         make_application_wrapper(get_pinned_runtime(&runtime_wrapper).get_application(&my_app_str));
 
     let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
-    // upcast::<message, message_base>(get_pinned_message(&request)).set_service(SAMPLE_SERVICE_ID);
-    // upcast::<message, message_base>(get_pinned_message(&request)).set_instance(SAMPLE_INSTANCE_ID);
-    // upcast::<message, message_base>(get_pinned_message(&request)).set_method(SAMPLE_METHOD_ID);
+    get_pinned_message_base(&request).set_service(SAMPLE_SERVICE_ID);
+    get_pinned_message_base(&request).set_instance(SAMPLE_INSTANCE_ID);
+    get_pinned_message_base(&request).set_method(SAMPLE_METHOD_ID);
 
-    // let msg = upcast::<message, message_base>(get_pinned_message(&request)).is_reliable();
-    //
-    // println!("msg: {msg}");
-    //
-    // // Get the SharedPtr<vsomeip_v3::message> from the wrapper
-    // let shared_ptr = request.as_ref().unwrap().get_shared_ptr();
-    //
-    // println!("attempting send...");
-    //
-    // get_pinned_application(&app_wrapper).send(shared_ptr);
-    //
-    // sleep(Duration::from_millis(5000));
+    let msg = get_pinned_message_base(&request).is_reliable();
+
+    println!("msg: {msg}");
+
+    // Get the SharedPtr<vsomeip_v3::message> from the wrapper
+    let shared_ptr = request.as_ref().unwrap().get_shared_ptr();
+
+    println!("attempting send...");
+
+    get_pinned_application(&app_wrapper).send(shared_ptr);
+
+    sleep(Duration::from_millis(10000));
 }
