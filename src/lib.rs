@@ -127,6 +127,7 @@ mod tests {
     use crate::pinned::{get_pinned_application, get_pinned_message, get_pinned_runtime, upcast};
     use cxx::let_cxx_string;
     use crate::{AvailabilityHandlerFnPtr, ffi, vsomeip};
+    use crate::vsomeip::{message, message_base};
 
     #[test]
     fn test_make_runtime() {
@@ -146,7 +147,9 @@ mod tests {
         let callback = AvailabilityHandlerFnPtr(callback);
         get_pinned_application(&app_wrapper).register_availability_handler(1, 2, callback, 3, 4);
         let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
-        let foo: Pin<&mut vsomeip::message_base> = upcast(get_pinned_message(&request));
-        foo.set_service(10);
+        // let foo: Pin<&mut vsomeip::message_base> = upcast(get_pinned_message(&request));
+        // foo.set_service(10);
+
+        upcast::<message, message_base>(get_pinned_message(&request)).set_service(10);
     }
 }
