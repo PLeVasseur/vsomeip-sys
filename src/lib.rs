@@ -18,6 +18,7 @@ include_cpp! {
     #include "runtime_wrapper.h"
     #include "application_wrapper.h"
     #include "message_wrapper.h"
+    #include "payload_wrapper.h"
     safety!(unsafe) // see details of unsafety policies described in the 'safety' section of the book
     generate!("vsomeip_v3::runtime") // add this line for each function or type you wish to generate
     generate!("vsomeip_v3::application")
@@ -32,6 +33,8 @@ include_cpp! {
     generate!("MessageWrapper")
     generate!("make_message_wrapper")
     generate!("upcast")
+    generate!("PayloadWrapper")
+    generate!("make_payload_wrapper")
     // generate!("return_availability_handler")
     // generate!("vsomeip_v3::availability_handler_fn_ptr")
     // generate!("fake_availability_state_handler_fn")
@@ -68,6 +71,17 @@ mod foo {
             _method: u16,
             _fn_ptr_handler: message_handler_fn_ptr,
         );
+
+        type payload = crate::vsomeip::payload;
+        pub unsafe fn set_data(
+            self: Pin<&mut payload>,
+            _data: *const u8,
+            _length: u32,
+        );
+
+        pub fn get_data(
+            self: &payload,
+        ) -> *const u8;
     }
 }
 
@@ -101,21 +115,14 @@ pub mod vsomeip {
 
 pub mod pinned {
     use std::cell::UnsafeCell;
-    use crate::ffi::vsomeip_v3::{application, message, runtime};
+    use crate::ffi::vsomeip_v3::{application, message, runtime, payload};
     pub use crate::ffi::{
-        make_application_wrapper, make_message_wrapper, make_runtime_wrapper, ApplicationWrapper,
-        MessageWrapper, RuntimeWrapper,
+        make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper, ApplicationWrapper,
+        MessageWrapper, RuntimeWrapper, PayloadWrapper
     };
     use std::pin::Pin;
     pub use crate::ffi::upcast;
     use crate::vsomeip::message_base;
-
-    // pub fn upcast<D, S>(derived: Pin<&mut D>) -> Pin<&mut S> {
-    //     unsafe {
-    //         let subclass_obs_ptr = Pin::into_inner_unchecked(derived) as *mut D;
-    //         Pin::new_unchecked(&mut *subclass_obs_ptr.cast::<S>())
-    //     }
-    // }
 
     pub fn get_pinned_runtime(wrapper: &RuntimeWrapper) -> Pin<&mut runtime> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
@@ -139,20 +146,6 @@ pub mod pinned {
         }
     }
 
-    // pub fn get_pinned_message_base(wrapper: &MessageWrapper) -> Pin<&mut message_base> {
-    //     unsafe {
-    //         let pinned_msg: Pin<&mut message> = get_message(wrapper);
-    //         let base_ptr = upcast(pinned_msg);
-    //
-    //         // Check if base_ptr is null
-    //         if (&*base_ptr as *const _ as *const u8).is_null() {
-    //             panic!("base_ptr is null after upcast");
-    //         }
-    //
-    //         base_ptr
-    //     }
-    // }
-
     pub fn get_pinned_message_base(wrapper: &MessageWrapper) -> Pin<&mut message_base> {
         unsafe {
             let msg_ptr: *mut message = wrapper.get_mut();
@@ -172,17 +165,22 @@ pub mod pinned {
             pinned_base_ref
         }
     }
+
+    pub fn get_pinned_payload(wrapper: &PayloadWrapper) -> Pin<&mut payload> {
+        unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ffi::vsomeip_v3::runtime;
-    use crate::ffi::{make_application_wrapper, make_message_wrapper, make_runtime_wrapper};
-    use crate::pinned::{get_pinned_application, get_pinned_message, get_pinned_message_base, get_pinned_runtime, upcast};
+    use crate::ffi::{make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper};
+    use crate::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, upcast};
     use crate::vsomeip::{message, message_base};
     use crate::{ffi, vsomeip, AvailabilityHandlerFnPtr};
     use cxx::let_cxx_string;
     use std::pin::Pin;
+    use std::slice;
 
     #[test]
     fn test_make_runtime() {
@@ -211,6 +209,34 @@ mod tests {
 
         println!("reliable? {reliable}");
 
-        // let msg = upcast::<message, message_base>(get_pinned_message(&request)).is_reliable();
+        let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
+        get_pinned_message_base(&request).set_service(1);
+        get_pinned_message_base(&request).set_instance(2);
+        get_pinned_message_base(&request).set_method(3);
+
+        let payload_wrapper = make_payload_wrapper(get_pinned_runtime(&runtime_wrapper).create_payload());
+        let foo = get_pinned_payload(&payload_wrapper);
+
+        // Data to be passed to set_data
+        let data: Vec<u8> = vec![1, 2, 3, 4, 5];
+
+        // Get the length of the data
+        let length = data.len() as u32;
+
+        // Get a pointer to the data
+        let data_ptr = data.as_ptr();
+
+        unsafe { foo.set_data(data_ptr, length); }
+
+        let retrieved_data_ptr = get_pinned_payload(&payload_wrapper).get_data();
+
+        // Convert the raw pointer and length to a slice
+        let data_slice: &[u8] = unsafe { slice::from_raw_parts(retrieved_data_ptr, length as usize) };
+
+        // Convert the slice to a Vec
+        let data_vec: Vec<u8> = data_slice.to_vec();
+
+        // Print the data
+        println!("{:?}", data_vec);
     }
 }

@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use vsomeip_sys::pinned::{get_pinned_application, get_pinned_message, get_pinned_message_base, get_pinned_runtime, make_application_wrapper, make_message_wrapper, make_runtime_wrapper, upcast};
+use vsomeip_sys::pinned::{get_pinned_application, get_pinned_payload, get_pinned_message_base, get_pinned_runtime, make_application_wrapper, make_message_wrapper, make_runtime_wrapper, make_payload_wrapper};
 use vsomeip_sys::vsomeip::{application, message, message_base, runtime};
 use vsomeip_sys::AvailabilityHandlerFnPtr;
 
@@ -117,16 +117,20 @@ fn main() {
     get_pinned_message_base(&request).set_instance(SAMPLE_INSTANCE_ID);
     get_pinned_message_base(&request).set_method(SAMPLE_METHOD_ID);
 
-    let msg = get_pinned_message_base(&request).is_reliable();
+    let payload_wrapper = make_payload_wrapper(get_pinned_runtime(&runtime_wrapper).create_payload());
+    // get_pinned_payload(payload_wrapper)
 
-    println!("msg: {msg}");
-
-    // Get the SharedPtr<vsomeip_v3::message> from the wrapper
-    let shared_ptr = request.as_ref().unwrap().get_shared_ptr();
-
+    let shared_ptr_message = request.as_ref().unwrap().get_shared_ptr();
     println!("attempting send...");
+    get_pinned_application(&app_wrapper).send(shared_ptr_message);
 
-    get_pinned_application(&app_wrapper).send(shared_ptr);
+    let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
+    get_pinned_message_base(&request).set_service(SAMPLE_SERVICE_ID);
+    get_pinned_message_base(&request).set_instance(SAMPLE_INSTANCE_ID);
+    get_pinned_message_base(&request).set_method(SAMPLE_METHOD_ID);
+    let shared_ptr_message = request.as_ref().unwrap().get_shared_ptr();
+    println!("attempting send...");
+    get_pinned_application(&app_wrapper).send(shared_ptr_message);
 
     sleep(Duration::from_millis(10000));
 }
