@@ -31,6 +31,7 @@ include_cpp! {
     generate!("make_application_wrapper")
     generate!("MessageWrapper")
     generate!("make_message_wrapper")
+    generate!("upcast")
     // generate!("return_availability_handler")
     // generate!("vsomeip_v3::availability_handler_fn_ptr")
     // generate!("fake_availability_state_handler_fn")
@@ -49,21 +50,23 @@ mod foo {
         type application = crate::vsomeip::application;
         type availability_handler_fn_ptr = crate::AvailabilityHandlerFnPtr;
 
-        pub fn register_availability_handler(self: Pin<&mut application>,
-                                             _service: u16,
-                                             _instance: u16,
-                                             _fn_ptr_handler: availability_handler_fn_ptr,
-                                             _major: u8,
-                                             _minor: u32
+        pub fn register_availability_handler(
+            self: Pin<&mut application>,
+            _service: u16,
+            _instance: u16,
+            _fn_ptr_handler: availability_handler_fn_ptr,
+            _major: u8,
+            _minor: u32,
         );
 
         type message_handler_fn_ptr = crate::MessageHandlerFnPtr;
 
-        pub fn register_message_handler(self: Pin<&mut application>,
-                                            _service: u16,
-                                            _instance: u16,
-                                            _method: u16,
-                                            _fn_ptr_handler: message_handler_fn_ptr,
+        pub fn register_message_handler(
+            self: Pin<&mut application>,
+            _service: u16,
+            _instance: u16,
+            _method: u16,
+            _fn_ptr_handler: message_handler_fn_ptr,
         );
     }
 }
@@ -72,7 +75,11 @@ use cxx::{type_id, ExternType, SharedPtr};
 
 #[repr(transparent)]
 pub struct AvailabilityHandlerFnPtr(
-    pub extern "C" fn(service: ffi::vsomeip_v3::service_t, instance: ffi::vsomeip_v3::instance_t, availability: bool),
+    pub  extern "C" fn(
+        service: ffi::vsomeip_v3::service_t,
+        instance: ffi::vsomeip_v3::instance_t,
+        availability: bool,
+    ),
 );
 
 unsafe impl ExternType for AvailabilityHandlerFnPtr {
@@ -81,9 +88,7 @@ unsafe impl ExternType for AvailabilityHandlerFnPtr {
 }
 
 #[repr(transparent)]
-pub struct  MessageHandlerFnPtr(
-    pub extern "C" fn(&SharedPtr<vsomeip::message>),
-);
+pub struct MessageHandlerFnPtr(pub extern "C" fn(&SharedPtr<vsomeip::message>));
 
 unsafe impl ExternType for MessageHandlerFnPtr {
     type Id = type_id!("vsomeip_v3::message_handler_fn_ptr");
@@ -95,16 +100,22 @@ pub mod vsomeip {
 }
 
 pub mod pinned {
-    use crate::ffi::vsomeip_v3::{application, runtime, message};
-    pub use crate::ffi::{ApplicationWrapper, RuntimeWrapper, MessageWrapper, make_runtime_wrapper, make_application_wrapper, make_message_wrapper};
+    use std::cell::UnsafeCell;
+    use crate::ffi::vsomeip_v3::{application, message, runtime};
+    pub use crate::ffi::{
+        make_application_wrapper, make_message_wrapper, make_runtime_wrapper, ApplicationWrapper,
+        MessageWrapper, RuntimeWrapper,
+    };
     use std::pin::Pin;
+    pub use crate::ffi::upcast;
+    use crate::vsomeip::message_base;
 
-    pub fn upcast<D, S>(derived: Pin<&mut D>) -> Pin<&mut S> {
-        unsafe {
-            let subclass_obs_ptr = Pin::into_inner_unchecked(derived) as *mut D;
-            Pin::new_unchecked(&mut *subclass_obs_ptr.cast::<S>())
-        }
-    }
+    // pub fn upcast<D, S>(derived: Pin<&mut D>) -> Pin<&mut S> {
+    //     unsafe {
+    //         let subclass_obs_ptr = Pin::into_inner_unchecked(derived) as *mut D;
+    //         Pin::new_unchecked(&mut *subclass_obs_ptr.cast::<S>())
+    //     }
+    // }
 
     pub fn get_pinned_runtime(wrapper: &RuntimeWrapper) -> Pin<&mut runtime> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
@@ -117,21 +128,64 @@ pub mod pinned {
     pub fn get_pinned_message(wrapper: &MessageWrapper) -> Pin<&mut message> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
     }
+
+    pub fn get_message(wrapper: &MessageWrapper) -> Pin<&mut message> {
+        unsafe {
+            let msg_ptr: *mut message = wrapper.get_mut();
+            if msg_ptr.is_null() {
+                panic!("msg_ptr is null");
+            }
+            Pin::new_unchecked(msg_ptr.as_mut().unwrap())
+        }
+    }
+
+    // pub fn get_pinned_message_base(wrapper: &MessageWrapper) -> Pin<&mut message_base> {
+    //     unsafe {
+    //         let pinned_msg: Pin<&mut message> = get_message(wrapper);
+    //         let base_ptr = upcast(pinned_msg);
+    //
+    //         // Check if base_ptr is null
+    //         if (&*base_ptr as *const _ as *const u8).is_null() {
+    //             panic!("base_ptr is null after upcast");
+    //         }
+    //
+    //         base_ptr
+    //     }
+    // }
+
+    pub fn get_pinned_message_base(wrapper: &MessageWrapper) -> Pin<&mut message_base> {
+        unsafe {
+            let msg_ptr: *mut message = wrapper.get_mut();
+            if msg_ptr.is_null() {
+                panic!("msg_ptr is null");
+            }
+
+            // Convert the raw pointer to a mutable reference
+            let msg_ref: &mut message = &mut *msg_ptr;
+
+            // Pin the mutable reference
+            let pinned_msg_ref: Pin<&mut message> = Pin::new_unchecked(msg_ref);
+
+            // Use the upcast function to get a pinned mutable reference to message_base
+            let pinned_base_ref: Pin<&mut message_base> = upcast(pinned_msg_ref);
+
+            pinned_base_ref
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::pin::Pin;
     use crate::ffi::vsomeip_v3::runtime;
     use crate::ffi::{make_application_wrapper, make_message_wrapper, make_runtime_wrapper};
-    use crate::pinned::{get_pinned_application, get_pinned_message, get_pinned_runtime, upcast};
-    use cxx::let_cxx_string;
-    use crate::{AvailabilityHandlerFnPtr, ffi, vsomeip};
+    use crate::pinned::{get_pinned_application, get_pinned_message, get_pinned_message_base, get_pinned_runtime, upcast};
     use crate::vsomeip::{message, message_base};
+    use crate::{ffi, vsomeip, AvailabilityHandlerFnPtr};
+    use cxx::let_cxx_string;
+    use std::pin::Pin;
 
     #[test]
     fn test_make_runtime() {
-
         let my_runtime = runtime::get();
         let runtime_wrapper = make_runtime_wrapper(my_runtime);
 
@@ -141,15 +195,22 @@ mod tests {
         );
         get_pinned_application(&app_wrapper).init();
 
-        extern "C" fn callback(service: ffi::vsomeip_v3::service_t, instance: ffi::vsomeip_v3::instance_t, availability: bool) {
+        extern "C" fn callback(
+            service: ffi::vsomeip_v3::service_t,
+            instance: ffi::vsomeip_v3::instance_t,
+            availability: bool,
+        ) {
             println!("hello from Rust!");
         }
         let callback = AvailabilityHandlerFnPtr(callback);
         get_pinned_application(&app_wrapper).register_availability_handler(1, 2, callback, 3, 4);
-        let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
-        // let foo: Pin<&mut vsomeip::message_base> = upcast(get_pinned_message(&request));
-        // foo.set_service(10);
+        let request =
+            make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
 
-        upcast::<message, message_base>(get_pinned_message(&request)).set_service(10);
+        let reliable = get_pinned_message_base(&request).is_reliable();
+
+        println!("reliable? {reliable}");
+
+        // let msg = upcast::<message, message_base>(get_pinned_message(&request)).is_reliable();
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <iostream>
 #include "vsomeip/vsomeip.hpp"  // Adjust the path as necessary to include the runtime type
 
 class MessageWrapper {
@@ -11,10 +12,32 @@ public:
         return ptr_.get();
     }
 
+    std::shared_ptr<vsomeip_v3::message> get_shared_ptr() const {
+        return ptr_;
+    }
+
 private:
     std::shared_ptr<vsomeip_v3::message> ptr_;
 };
 
 std::unique_ptr<MessageWrapper> make_message_wrapper(std::shared_ptr<vsomeip_v3::message> ptr) {
     return std::make_unique<MessageWrapper>(std::move(ptr));
+}
+
+//inline vsomeip_v3::message_base* upcast(vsomeip_v3::message* derived) {
+//    if (derived) {
+//        std::cout << "Upcasting non-null message pointer\n";
+//    } else {
+//        std::cout << "Attempted to upcast a null message pointer\n";
+//    }
+//    return derived;
+//}
+
+//// Define the upcast function as recommended
+//inline const vsomeip_v3::message_base& upcast(const vsomeip_v3::message& derived) {
+//    return derived;
+//}
+
+inline vsomeip_v3::message_base& upcast(vsomeip_v3::message& derived) {
+    return derived;
 }

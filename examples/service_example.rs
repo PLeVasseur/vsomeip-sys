@@ -1,5 +1,7 @@
 use cxx::{let_cxx_string, SharedPtr};
-use vsomeip_sys::pinned::{get_pinned_application, get_pinned_runtime, make_application_wrapper, make_runtime_wrapper};
+use vsomeip_sys::pinned::{
+    get_pinned_application, get_pinned_runtime, make_application_wrapper, make_runtime_wrapper,
+};
 use vsomeip_sys::vsomeip;
 use vsomeip_sys::vsomeip::{application, runtime};
 
@@ -20,6 +22,11 @@ fn main() {
     extern "C" fn on_message(request: &SharedPtr<vsomeip::message>) {
         println!("received Request!");
     }
-    get_pinned_application(&app_wrapper).offer_service(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, SAMPLE_MAJOR_VERSION, SAMPLE_MINOR_VERSION);
+    get_pinned_application(&app_wrapper).offer_service(
+        SAMPLE_SERVICE_ID,
+        SAMPLE_INSTANCE_ID,
+        vsomeip::ANY_MAJOR,
+        vsomeip::ANY_MINOR,
+    );
     get_pinned_application(&app_wrapper).start();
 }
