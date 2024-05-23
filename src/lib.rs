@@ -17,10 +17,11 @@ include_cpp! {
     #include "vsomeip/vsomeip.hpp"
     #include "runtime_wrapper.h"
     #include "application_wrapper.h"
-    #include "function_pointer_to_std_function.h"
+    #include "message_wrapper.h"
     safety!(unsafe) // see details of unsafety policies described in the 'safety' section of the book
     generate!("vsomeip_v3::runtime") // add this line for each function or type you wish to generate
     generate!("vsomeip_v3::application")
+    generate!("vsomeip_v3::message_base") // add this line for each function or type you wish to generate
     generate!("vsomeip_v3::message_t") // add this line for each function or type you wish to generate
     generate!("vsomeip_v3::ANY_MAJOR")
     generate!("vsomeip_v3::ANY_MINOR")
@@ -28,7 +29,8 @@ include_cpp! {
     generate!("make_runtime_wrapper")
     generate!("ApplicationWrapper")
     generate!("make_application_wrapper")
-    generate!("fake_availability_handler_fn")
+    generate!("MessageWrapper")
+    generate!("make_message_wrapper")
     // generate!("return_availability_handler")
     // generate!("vsomeip_v3::availability_handler_fn_ptr")
     // generate!("fake_availability_state_handler_fn")
@@ -93,9 +95,16 @@ pub mod vsomeip {
 }
 
 pub mod pinned {
-    use crate::ffi::vsomeip_v3::{application, runtime};
-    pub use crate::ffi::{ApplicationWrapper, RuntimeWrapper, make_runtime_wrapper, make_application_wrapper};
+    use crate::ffi::vsomeip_v3::{application, runtime, message};
+    pub use crate::ffi::{ApplicationWrapper, RuntimeWrapper, MessageWrapper, make_runtime_wrapper, make_application_wrapper, make_message_wrapper};
     use std::pin::Pin;
+
+    pub fn upcast<D, S>(derived: Pin<&mut D>) -> Pin<&mut S> {
+        unsafe {
+            let subclass_obs_ptr = Pin::into_inner_unchecked(derived) as *mut D;
+            Pin::new_unchecked(&mut *subclass_obs_ptr.cast::<S>())
+        }
+    }
 
     pub fn get_pinned_runtime(wrapper: &RuntimeWrapper) -> Pin<&mut runtime> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
@@ -104,15 +113,20 @@ pub mod pinned {
     pub fn get_pinned_application(wrapper: &ApplicationWrapper) -> Pin<&mut application> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
     }
+
+    pub fn get_pinned_message(wrapper: &MessageWrapper) -> Pin<&mut message> {
+        unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::pin::Pin;
     use crate::ffi::vsomeip_v3::runtime;
-    use crate::ffi::{make_application_wrapper, make_runtime_wrapper};
-    use crate::pinned::{get_pinned_application, get_pinned_runtime};
+    use crate::ffi::{make_application_wrapper, make_message_wrapper, make_runtime_wrapper};
+    use crate::pinned::{get_pinned_application, get_pinned_message, get_pinned_runtime, upcast};
     use cxx::let_cxx_string;
-    use crate::{AvailabilityHandlerFnPtr, ffi};
+    use crate::{AvailabilityHandlerFnPtr, ffi, vsomeip};
 
     #[test]
     fn test_make_runtime() {
@@ -131,6 +145,8 @@ mod tests {
         }
         let callback = AvailabilityHandlerFnPtr(callback);
         get_pinned_application(&app_wrapper).register_availability_handler(1, 2, callback, 3, 4);
-        // get_pinned_application(&app_wrapper).start();
+        let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
+        let foo: Pin<&mut vsomeip::message_base> = upcast(get_pinned_message(&request));
+        foo.set_service(10);
     }
 }

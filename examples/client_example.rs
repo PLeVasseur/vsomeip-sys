@@ -2,7 +2,7 @@ use std::sync::Mutex;
 use cxx::let_cxx_string;
 use lazy_static::lazy_static;
 use vsomeip_sys::AvailabilityHandlerFnPtr;
-use vsomeip_sys::pinned::{get_pinned_application, get_pinned_runtime, make_application_wrapper, make_runtime_wrapper};
+use vsomeip_sys::pinned::{get_pinned_application, get_pinned_runtime, get_pinned_message, make_application_wrapper, make_runtime_wrapper, make_message_wrapper};
 use vsomeip_sys::vsomeip::{application, runtime};
 
 const SAMPLE_SERVICE_ID: u16 = 0x1234;
@@ -47,7 +47,8 @@ fn main() {
     get_pinned_application(&app_wrapper).register_availability_handler(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, callback, vsomeip_sys::vsomeip::ANY_MAJOR, vsomeip_sys::vsomeip::ANY_MINOR);
     get_pinned_application(&app_wrapper).request_service(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, vsomeip_sys::vsomeip::ANY_MAJOR, vsomeip_sys::vsomeip::ANY_MINOR);
 
-    let request = get_pinned_runtime(&runtime_wrapper).create_request(true);
+    let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
+
 
     get_pinned_application(&app_wrapper).start();
 }
