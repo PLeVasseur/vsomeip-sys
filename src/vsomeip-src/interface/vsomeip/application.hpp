@@ -516,9 +516,12 @@ public:
      * parameters.
      *
      */
+//    virtual void register_message_handler(service_t _service,
+//            instance_t _instance, method_t _method,
+//            const message_handler_t &_handler) = 0;
     virtual void register_message_handler(service_t _service,
             instance_t _instance, method_t _method,
-            const message_handler_t &_handler) = 0;
+            message_handler_fn_ptr _fn_ptr_handler) = 0;
     /**
      *
      * \brief Unregisters the message handler for the specified service

@@ -44,8 +44,8 @@ mod foo {
     unsafe extern "C++" {
         include!("vsomeip/vsomeip.hpp");
 
-        type availability_handler_fn_ptr = crate::AvailabilityHandlerFnPtr;
         type application = crate::vsomeip::application;
+        type availability_handler_fn_ptr = crate::AvailabilityHandlerFnPtr;
 
         pub fn register_availability_handler(self: Pin<&mut application>,
                                              _service: u16,
@@ -54,10 +54,19 @@ mod foo {
                                              _major: u8,
                                              _minor: u32
         );
+
+        type message_handler_fn_ptr = crate::MessageHandlerFnPtr;
+
+        pub fn register_message_handler(self: Pin<&mut application>,
+                                            _service: u16,
+                                            _instance: u16,
+                                            _method: u16,
+                                            _fn_ptr_handler: message_handler_fn_ptr,
+        );
     }
 }
 
-use cxx::{type_id, ExternType};
+use cxx::{type_id, ExternType, SharedPtr};
 
 #[repr(transparent)]
 pub struct AvailabilityHandlerFnPtr(
@@ -66,6 +75,16 @@ pub struct AvailabilityHandlerFnPtr(
 
 unsafe impl ExternType for AvailabilityHandlerFnPtr {
     type Id = type_id!("vsomeip_v3::availability_handler_fn_ptr");
+    type Kind = cxx::kind::Trivial;
+}
+
+#[repr(transparent)]
+pub struct  MessageHandlerFnPtr(
+    pub extern "C" fn(&SharedPtr<vsomeip::message>),
+);
+
+unsafe impl ExternType for MessageHandlerFnPtr {
+    type Id = type_id!("vsomeip_v3::message_handler_fn_ptr");
     type Kind = cxx::kind::Trivial;
 }
 

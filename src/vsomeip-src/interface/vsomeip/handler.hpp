@@ -20,6 +20,7 @@ class message;
 
 typedef std::function< void (state_type_e) > state_handler_t;
 typedef std::function< void (const std::shared_ptr< message > &) > message_handler_t;
+using message_handler_fn_ptr = void (*)(const std::shared_ptr< message > &);
 typedef std::function< void (service_t, instance_t, bool) > availability_handler_t;
 using availability_handler_fn_ptr = void (*)(service_t, instance_t, bool);
 //typedef void (*availability_handler_fn_ptr)(service_t, instance_t, bool);

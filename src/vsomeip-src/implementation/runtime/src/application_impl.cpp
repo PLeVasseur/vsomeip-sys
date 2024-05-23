@@ -1373,8 +1373,12 @@ void application_impl::unregister_subscription_status_handler(service_t _service
     }
 }
 
+//void application_impl::register_message_handler(service_t _service,
+//        instance_t _instance, method_t _method, const message_handler_t &_handler) {
 void application_impl::register_message_handler(service_t _service,
-        instance_t _instance, method_t _method, const message_handler_t &_handler) {
+        instance_t _instance, method_t _method, message_handler_fn_ptr _fn_ptr_handler) {
+
+    auto _handler = message_handler_t(_fn_ptr_handler);
 
     register_message_handler_ext(_service, _instance, _method, _handler,
             handler_registration_type_e::HRT_REPLACE);

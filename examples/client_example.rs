@@ -46,5 +46,8 @@ fn main() {
     get_pinned_application(&app_wrapper).init();
     get_pinned_application(&app_wrapper).register_availability_handler(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, callback, vsomeip_sys::vsomeip::ANY_MAJOR, vsomeip_sys::vsomeip::ANY_MINOR);
     get_pinned_application(&app_wrapper).request_service(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, vsomeip_sys::vsomeip::ANY_MAJOR, vsomeip_sys::vsomeip::ANY_MINOR);
+
+    let request = get_pinned_runtime(&runtime_wrapper).create_request(true);
+
     get_pinned_application(&app_wrapper).start();
 }
