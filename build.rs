@@ -36,8 +36,8 @@ fn main() -> miette::Result<()> {
     )
     .expect("Unable to extract tar.gz");
 
-    // let interface_path = Path::new("src").join("vsomeip-src").join("interface");
-    let interface_path = vsomeip_decompressed_folder.join("interface");
+    let interface_path = Path::new("src").join("vsomeip-src").join("interface");
+    // let interface_path = vsomeip_decompressed_folder.join("interface");
     // for some reason unless we explicitly provide paths to headers for the stdlib here we have issues
     // I don't think we should really _have_ to do this though, as their locations are
     // more or less consistent on every instance of the different platforms
