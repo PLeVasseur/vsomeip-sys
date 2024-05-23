@@ -2,11 +2,12 @@ use std::sync::Mutex;
 use cxx::let_cxx_string;
 use lazy_static::lazy_static;
 use vsomeip_sys::AvailabilityHandlerFnPtr;
-use vsomeip_sys::pinned::{get_pinned_application, get_pinned_runtime, get_pinned_message, make_application_wrapper, make_runtime_wrapper, make_message_wrapper};
-use vsomeip_sys::vsomeip::{application, runtime};
+use vsomeip_sys::pinned::{get_pinned_application, get_pinned_runtime, get_pinned_message, make_application_wrapper, make_runtime_wrapper, make_message_wrapper, upcast};
+use vsomeip_sys::vsomeip::{application, message, message_base, runtime};
 
 const SAMPLE_SERVICE_ID: u16 = 0x1234;
 const SAMPLE_INSTANCE_ID: u16 = 0x5678;
+const SAMPLE_METHOD_ID: u16 = 0x0421;
 
 type CallbackFunc = extern "C" fn(vsomeip_sys::vsomeip::service_t, vsomeip_sys::vsomeip::instance_t, bool);
 
@@ -48,6 +49,9 @@ fn main() {
     get_pinned_application(&app_wrapper).request_service(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, vsomeip_sys::vsomeip::ANY_MAJOR, vsomeip_sys::vsomeip::ANY_MINOR);
 
     let request = make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
+    upcast::<message, message_base>(get_pinned_message(&request)).set_service(SAMPLE_SERVICE_ID);
+    upcast::<message, message_base>(get_pinned_message(&request)).set_instance(SAMPLE_INSTANCE_ID);
+    upcast::<message, message_base>(get_pinned_message(&request)).set_method(SAMPLE_METHOD_ID);
 
 
     get_pinned_application(&app_wrapper).start();
