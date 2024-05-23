@@ -352,9 +352,13 @@ mod tests {
 
         println!("set_message_payload");
 
-        let payload = get_message_payload(&mut request);
+        let loaded_payload = get_message_payload(&mut request);
 
         println!("get_message_payload");
+
+        let loaded_data_vec = get_data_safe(&loaded_payload);
+
+        println!("loaded_data_vec: {loaded_data_vec:?}");
 
         std::thread::sleep(Duration::from_millis(2000));
     }
