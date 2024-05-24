@@ -7,7 +7,7 @@ use std::sync::{Mutex, Once};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use vsomeip_sys::pinned::{CallbackStorage, get_pinned_application, get_pinned_message, get_pinned_message_base, get_pinned_payload, get_pinned_runtime, make_application_wrapper, make_message_wrapper, make_payload_wrapper, make_runtime_wrapper, set_data_safe};
+use vsomeip_sys::pinned::{AvailabilityHandlerCallbackStorage, get_pinned_application, get_pinned_message, get_pinned_message_base, get_pinned_payload, get_pinned_runtime, make_application_wrapper, make_message_wrapper, make_payload_wrapper, make_runtime_wrapper, set_data_safe};
 use vsomeip_sys::vsomeip::{application, instance_t, message, message_base, runtime, service_t};
 use vsomeip_sys::AvailabilityHandlerFnPtr;
 
@@ -25,7 +25,7 @@ fn start_app() {
     );
 
     let (my_callback, _callback_id) =
-        CallbackStorage::create_callback(|service, instance, availability| {
+        AvailabilityHandlerCallbackStorage::create_callback(|service, instance, availability| {
             println!(
                 "Service [{:04x}.{:x}] is {}",
                 service,

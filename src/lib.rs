@@ -118,14 +118,14 @@ pub mod pinned {
     };
     use crate::ffi::{get_payload_raw, set_payload_raw};
     use crate::vsomeip::{instance_t, message_base, service_t};
-    use cxx::UniquePtr;
+    use cxx::{SharedPtr, UniquePtr};
     use std::cell::UnsafeCell;
     use std::collections::HashMap;
     use std::pin::Pin;
     use std::slice;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Mutex, Once};
-    use crate::AvailabilityHandlerFnPtr;
+    use crate::{AvailabilityHandlerFnPtr, MessageHandlerFnPtr};
 
     pub fn get_pinned_runtime(wrapper: &RuntimeWrapper) -> Pin<&mut runtime> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
@@ -250,20 +250,20 @@ pub mod pinned {
         }
     }
 
-    type Callback = Box<dyn Fn(service_t, instance_t, bool) + Send + Sync>;
+    type AvailabilityHandlerCallback = Box<dyn Fn(service_t, instance_t, bool) + Send + Sync>;
 
-    pub struct CallbackStorage {
-        callbacks: Mutex<HashMap<usize, Callback>>,
+    pub struct AvailabilityHandlerCallbackStorage {
+        callbacks: Mutex<HashMap<usize, AvailabilityHandlerCallback>>,
         next_id: AtomicUsize,
     }
 
-    impl CallbackStorage {
+    impl AvailabilityHandlerCallbackStorage {
         fn instance() -> &'static Self {
             static ONCE: Once = Once::new();
-            static mut INSTANCE: *const CallbackStorage = 0 as *const CallbackStorage;
+            static mut INSTANCE: *const AvailabilityHandlerCallbackStorage = 0 as *const AvailabilityHandlerCallbackStorage;
 
             ONCE.call_once(|| {
-                let instance = CallbackStorage {
+                let instance = AvailabilityHandlerCallbackStorage {
                     callbacks: Mutex::new(HashMap::new()),
                     next_id: AtomicUsize::new(1),
                 };
@@ -299,6 +299,59 @@ pub mod pinned {
             let callbacks_lock = storage.callbacks.lock().unwrap();
             for callback in callbacks_lock.values() {
                 callback(service, instance, availability);
+            }
+        }
+    }
+
+    type MessageHandlerCallback = Box<dyn Fn(&SharedPtr<message>) + Send + Sync>;
+
+    pub struct MessageHandlerCallbackStorage {
+        callbacks: Mutex<HashMap<usize, MessageHandlerCallback>>,
+        next_id: AtomicUsize,
+    }
+
+    impl MessageHandlerCallbackStorage {
+        fn instance() -> &'static Self {
+            static ONCE: Once = Once::new();
+            static mut INSTANCE: *const MessageHandlerCallbackStorage = 0 as *const MessageHandlerCallbackStorage;
+
+            ONCE.call_once(|| {
+                let instance = MessageHandlerCallbackStorage {
+                    callbacks: Mutex::new(HashMap::new()),
+                    next_id: AtomicUsize::new(1),
+                };
+                unsafe {
+                    INSTANCE = Box::into_raw(Box::new(instance));
+                }
+            });
+
+            unsafe { &*INSTANCE }
+        }
+
+        pub fn create_callback<F>(func: F) -> (MessageHandlerFnPtr, usize)
+            where
+                F: Fn(&SharedPtr<message>) + 'static + Send + Sync,
+        {
+            let storage = Self::instance();
+            let mut callbacks_lock = storage.callbacks.lock().unwrap();
+
+            let id = storage.next_id.fetch_add(1, Ordering::SeqCst);
+            callbacks_lock.insert(id, Box::new(func));
+
+            (MessageHandlerFnPtr(Self::callback_wrapper), id)
+        }
+
+        pub fn destroy_callback(id: usize) {
+            let storage = Self::instance();
+            let mut callbacks_lock = storage.callbacks.lock().unwrap();
+            callbacks_lock.remove(&id);
+        }
+
+        extern "C" fn callback_wrapper(msg: &SharedPtr<message>) {
+            let storage = Self::instance();
+            let callbacks_lock = storage.callbacks.lock().unwrap();
+            for callback in callbacks_lock.values() {
+                callback(msg);
             }
         }
     }
