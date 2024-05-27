@@ -115,10 +115,10 @@ public:
     VSOMEIP_EXPORT void register_state_handler(const state_handler_t &_handler);
     VSOMEIP_EXPORT void unregister_state_handler();
 
-//    VSOMEIP_EXPORT void register_message_handler(service_t _service,
-//            instance_t _instance, method_t _method, const message_handler_t &_handler);
     VSOMEIP_EXPORT void register_message_handler(service_t _service,
-            instance_t _instance, method_t _method, message_handler_fn_ptr _fn_ptr_handler);
+            instance_t _instance, method_t _method, const message_handler_t &_handler);
+//    VSOMEIP_EXPORT void register_message_handler(service_t _service,
+//            instance_t _instance, method_t _method, message_handler_fn_ptr _fn_ptr_handler);
     VSOMEIP_EXPORT void unregister_message_handler(service_t _service,
             instance_t _instance, method_t _method);
 

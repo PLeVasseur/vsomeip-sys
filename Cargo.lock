@@ -430,6 +430,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cxx-build"
+version = "1.0.122"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9327c7f9fbd6329a200a5d4aa6f674c60ab256525ff0084b52a889d4e4c60cee"
+dependencies = [
+ "cc",
+ "codespan-reporting",
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "scratch",
+ "syn 2.0.64",
+]
+
+[[package]]
 name = "cxx-gen"
 version = "0.7.122"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1710,6 +1725,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "scratch"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3cf7c11c38cb994f3d40e8a8cde3bbd1f72a435e4c49e85d6553d8312306152"
+
+[[package]]
 name = "security-framework"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2237,6 +2258,7 @@ dependencies = [
  "autocxx-build",
  "crossbeam-channel",
  "cxx",
+ "cxx-build",
  "decompress",
  "lazy_static",
  "miette",

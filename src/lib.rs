@@ -11,6 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+mod cxx_bridge;
+
 use autocxx::prelude::*; // use all the main autocxx functions
 
 include_cpp! {
@@ -38,6 +40,7 @@ include_cpp! {
     generate!("set_payload_raw")
     generate!("get_payload_raw")
     generate!("create_payload_wrapper")
+    // generate!("register_message_handler_fn_ptr")
 }
 
 #[cxx::bridge(namespace = "vsomeip_v3")]
@@ -57,16 +60,6 @@ mod foo {
             _minor: u32,
         );
 
-        type message_handler_fn_ptr = crate::MessageHandlerFnPtr;
-
-        pub fn register_message_handler(
-            self: Pin<&mut application>,
-            _service: u16,
-            _instance: u16,
-            _method: u16,
-            _fn_ptr_handler: message_handler_fn_ptr,
-        );
-
         type payload = crate::vsomeip::payload;
         pub unsafe fn set_data(self: Pin<&mut payload>, _data: *const u8, _length: u32);
 
@@ -75,6 +68,26 @@ mod foo {
         pub fn get_length(self: &payload) -> u32;
     }
 }
+
+// #[cxx::bridge]
+// mod bar {
+//     unsafe extern "C++" {
+//         include!("vsomeip/vsomeip.hpp");
+//         include!("application_wrapper.h");
+//         include!("application_registrations.h");
+//
+//         type message_handler_fn_ptr = crate::MessageHandlerFnPtr;
+//         type ApplicationWrapper = crate::ffi::ApplicationWrapper;
+//
+//         pub unsafe fn register_message_handler_fn_ptr(
+//             _application: *mut ApplicationWrapper,
+//             _service: u16,
+//             _instance: u16,
+//             _method: u16,
+//             _fn_ptr_handler: message_handler_fn_ptr,
+//         );
+//     }
+// }
 
 use cxx::{type_id, ExternType, SharedPtr};
 
@@ -96,7 +109,7 @@ unsafe impl ExternType for AvailabilityHandlerFnPtr {
 pub struct MessageHandlerFnPtr(pub extern "C" fn(&SharedPtr<vsomeip::message>));
 
 unsafe impl ExternType for MessageHandlerFnPtr {
-    type Id = type_id!("vsomeip_v3::message_handler_fn_ptr");
+    type Id = type_id!("message_handler_fn_ptr");
     type Kind = cxx::kind::Trivial;
 }
 
@@ -118,7 +131,9 @@ pub mod pinned {
     };
     use crate::ffi::{get_payload_raw, set_payload_raw};
     use crate::vsomeip::{instance_t, message_base, service_t};
+    use crate::{AvailabilityHandlerFnPtr, MessageHandlerFnPtr};
     use cxx::{SharedPtr, UniquePtr};
+    use lazy_static::lazy_static;
     use std::cell::UnsafeCell;
     use std::collections::HashMap;
     use std::ffi::c_void;
@@ -126,8 +141,6 @@ pub mod pinned {
     use std::slice;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex, Once};
-    use lazy_static::lazy_static;
-    use crate::{AvailabilityHandlerFnPtr, MessageHandlerFnPtr};
 
     pub fn get_pinned_runtime(wrapper: &RuntimeWrapper) -> Pin<&mut runtime> {
         unsafe { Pin::new_unchecked(wrapper.get_mut().as_mut().unwrap()) }
@@ -252,6 +265,26 @@ pub mod pinned {
         }
     }
 
+    use crate::cxx_bridge::bar::register_message_handler_fn_ptr;
+    pub fn register_message_handler_fn_ptr_safe(
+        application_wrapper: &mut UniquePtr<ApplicationWrapper>,
+        _service: u16,
+        _instance: u16,
+        _method: u16,
+        _fn_ptr_handler: MessageHandlerFnPtr,
+    ) {
+        unsafe {
+            // Ensure application_wrapper is not null and get a mutable reference
+            let application_wrapper_ptr = application_wrapper.pin_mut().get_self();
+            register_message_handler_fn_ptr(application_wrapper_ptr, _service, _instance, _method, _fn_ptr_handler);
+            // // Pin the mutable reference to ApplicationWrapper
+            // let mut application_pin = Pin::new_unchecked(application_ref);
+            // // Get the raw pointer using get_self
+            // let application_ptr: *mut ApplicationWrapper = application_pin.as_mut().get_self();
+            // let application_ptr = ApplicationWrapper::get_mut(&**application_pin);
+        }
+    }
+
     type AvailabilityHandlerCallback = Box<dyn Fn(service_t, instance_t, bool) + Send + Sync>;
 
     pub struct AvailabilityHandlerCallbackStorage {
@@ -262,7 +295,8 @@ pub mod pinned {
     impl AvailabilityHandlerCallbackStorage {
         fn instance() -> &'static Self {
             static ONCE: Once = Once::new();
-            static mut INSTANCE: *const AvailabilityHandlerCallbackStorage = 0 as *const AvailabilityHandlerCallbackStorage;
+            static mut INSTANCE: *const AvailabilityHandlerCallbackStorage =
+                0 as *const AvailabilityHandlerCallbackStorage;
 
             ONCE.call_once(|| {
                 let instance = AvailabilityHandlerCallbackStorage {
@@ -278,8 +312,8 @@ pub mod pinned {
         }
 
         pub fn create_callback<F>(func: F) -> (AvailabilityHandlerFnPtr, usize)
-            where
-                F: Fn(service_t, instance_t, bool) + 'static + Send + Sync,
+        where
+            F: Fn(service_t, instance_t, bool) + 'static + Send + Sync,
         {
             let storage = Self::instance();
             let mut callbacks_lock = storage.callbacks.lock().unwrap();
@@ -296,7 +330,11 @@ pub mod pinned {
             callbacks_lock.remove(&id);
         }
 
-        extern "C" fn callback_wrapper(service: service_t, instance: instance_t, availability: bool) {
+        extern "C" fn callback_wrapper(
+            service: service_t,
+            instance: instance_t,
+            availability: bool,
+        ) {
             let storage = Self::instance();
             let callbacks_lock = storage.callbacks.lock().unwrap();
             for callback in callbacks_lock.values() {
@@ -308,14 +346,15 @@ pub mod pinned {
     type MessageHandlerCallback = Arc<dyn Fn(&SharedPtr<message>) + Send + Sync>;
 
     lazy_static! {
-    static ref CALLBACKS: Mutex<HashMap<usize, MessageHandlerCallback>> = Mutex::new(HashMap::new());
-    static ref NEXT_ID: AtomicUsize = AtomicUsize::new(1);
-    static ref CURRENT_ID: Mutex<Option<usize>> = Mutex::new(None);
-}
+        static ref CALLBACKS: Mutex<HashMap<usize, MessageHandlerCallback>> =
+            Mutex::new(HashMap::new());
+        static ref NEXT_ID: AtomicUsize = AtomicUsize::new(1);
+        static ref CURRENT_ID: Mutex<Option<usize>> = Mutex::new(None);
+    }
 
     fn store_callback<F>(func: F) -> usize
-        where
-            F: Fn(&SharedPtr<message>) + 'static + Send + Sync,
+    where
+        F: Fn(&SharedPtr<message>) + 'static + Send + Sync,
     {
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         let callback = Arc::new(func) as MessageHandlerCallback;
@@ -334,8 +373,8 @@ pub mod pinned {
     }
 
     pub fn create_callback<F>(func: F) -> MessageHandlerFnPtr
-        where
-            F: Fn(&SharedPtr<message>) + 'static + Send + Sync,
+    where
+        F: Fn(&SharedPtr<message>) + 'static + Send + Sync,
     {
         let id = store_callback(func);
         *CURRENT_ID.lock().unwrap() = Some(id);

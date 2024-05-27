@@ -24,9 +24,6 @@ fn main() -> miette::Result<()> {
     let vsomeip_decompressed_folder = Path::new(&out_dir).join("vsomeip").join("vsomeip-src");
     let vsomeip_archive_url = format!("{VSOMEIP_TAGGED_RELEASE_BASE}{VSOMEIP_VERSION_ARCHIVE}");
 
-    let project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let runtime_wrapper_dir = project_root.join("src/wrappers/include"); // Update the path as necessary
-
     download_and_write_file(&*vsomeip_archive_url, &vsomeip_archive_dest)
         .expect("Unable to download released archive");
     decompress::decompress(
@@ -35,6 +32,9 @@ fn main() -> miette::Result<()> {
         &ExtractOptsBuilder::default().strip(1).build().unwrap(),
     )
     .expect("Unable to extract tar.gz");
+
+    let project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let runtime_wrapper_dir = project_root.join("src/glue/include"); // Update the path as necessary
 
     let interface_path = Path::new("src").join("vsomeip-src").join("interface");
     // let interface_path = vsomeip_decompressed_folder.join("interface");
@@ -52,6 +52,22 @@ fn main() -> miette::Result<()> {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rustc-link-lib=vsomeip3");
     println!("cargo:rustc-link-search=native=/usr/local/lib");
+
+    let include_dir = project_root.join("src/glue"); // Update the path as necessary
+
+    cxx_build::bridge("src/cxx_bridge.rs")
+        .file("src/glue/application_registrations.cpp")
+        .file("src/glue/src/application_wrapper.cpp")
+        .include(&include_dir)
+        // .includes("src/glue/application_registrations.h")
+        // .include("/usr/include/c++/11")
+        // .include("/usr/include/x86_64-linux-gnu/c++/11")
+        // .include("/usr/include")
+        // .include(&interface_path)
+        // .include(&runtime_wrapper_dir)
+        .flag_if_supported("-std=c++17")
+        .compile("cxxbridge");
+    println!("cargo:rerun-if-changed=src/cxx_bridge.rs");
 
     Ok(())
 }
