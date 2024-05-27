@@ -562,12 +562,12 @@ public:
      * DEFAULT_MINOR and can be set to ANY_MINOR.
      *
      */
-//    virtual void register_availability_handler(service_t _service,
-//            instance_t _instance, const availability_handler_t &_handler,
-//            major_version_t _major = ANY_MAJOR, minor_version_t _minor = ANY_MINOR) = 0;
     virtual void register_availability_handler(service_t _service,
-            instance_t _instance, availability_handler_fn_ptr _fn_ptr_handler,
+            instance_t _instance, const availability_handler_t &_handler,
             major_version_t _major = ANY_MAJOR, minor_version_t _minor = ANY_MINOR) = 0;
+//    virtual void register_availability_handler(service_t _service,
+//            instance_t _instance, availability_handler_fn_ptr _fn_ptr_handler,
+//            major_version_t _major = ANY_MAJOR, minor_version_t _minor = ANY_MINOR) = 0;
 
     /**
      *

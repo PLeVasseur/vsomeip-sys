@@ -36,8 +36,8 @@ fn main() -> miette::Result<()> {
     let project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let runtime_wrapper_dir = project_root.join("src/glue/include"); // Update the path as necessary
 
-    let interface_path = Path::new("src").join("vsomeip-src").join("interface");
-    // let interface_path = vsomeip_decompressed_folder.join("interface");
+    // let interface_path = Path::new("src").join("vsomeip-src").join("interface");
+    let interface_path = vsomeip_decompressed_folder.join("interface");
     // for some reason unless we explicitly provide paths to headers for the stdlib here we have issues
     // I don't think we should really _have_ to do this though, as their locations are
     // more or less consistent on every instance of the different platforms

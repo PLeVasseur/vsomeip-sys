@@ -122,12 +122,12 @@ public:
     VSOMEIP_EXPORT void unregister_message_handler(service_t _service,
             instance_t _instance, method_t _method);
 
-//    VSOMEIP_EXPORT void register_availability_handler(service_t _service,
-//            instance_t _instance, const availability_handler_t &_handler,
-//            major_version_t _major, minor_version_t _minor);
     VSOMEIP_EXPORT void register_availability_handler(service_t _service,
-            instance_t _instance, availability_handler_fn_ptr _fn_ptr_handler,
+            instance_t _instance, const availability_handler_t &_handler,
             major_version_t _major, minor_version_t _minor);
+//    VSOMEIP_EXPORT void register_availability_handler(service_t _service,
+//            instance_t _instance, availability_handler_fn_ptr _fn_ptr_handler,
+//            major_version_t _major, minor_version_t _minor);
     VSOMEIP_EXPORT void register_availability_handler(service_t _service,
             instance_t _instance, const availability_state_handler_t &_handler,
             major_version_t _major, minor_version_t _minor);

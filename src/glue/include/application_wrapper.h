@@ -4,6 +4,7 @@
 #include "vsomeip/vsomeip.hpp"  // Adjust the path as necessary to include the runtime type
 
 using message_handler_fn_ptr = void (*)(const std::shared_ptr< vsomeip_v3::message > &);
+using availability_handler_fn_ptr = void (*)(vsomeip_v3::service_t, vsomeip_v3::instance_t, bool);
 
 class ApplicationWrapper {
 public:

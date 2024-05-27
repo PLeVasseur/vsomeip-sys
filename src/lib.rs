@@ -48,18 +48,6 @@ mod foo {
     unsafe extern "C++" {
         include!("vsomeip/vsomeip.hpp");
 
-        type application = crate::vsomeip::application;
-        type availability_handler_fn_ptr = crate::AvailabilityHandlerFnPtr;
-
-        pub fn register_availability_handler(
-            self: Pin<&mut application>,
-            _service: u16,
-            _instance: u16,
-            _fn_ptr_handler: availability_handler_fn_ptr,
-            _major: u8,
-            _minor: u32,
-        );
-
         type payload = crate::vsomeip::payload;
         pub unsafe fn set_data(self: Pin<&mut payload>, _data: *const u8, _length: u32);
 
@@ -101,7 +89,7 @@ pub struct AvailabilityHandlerFnPtr(
 );
 
 unsafe impl ExternType for AvailabilityHandlerFnPtr {
-    type Id = type_id!("vsomeip_v3::availability_handler_fn_ptr");
+    type Id = type_id!("availability_handler_fn_ptr");
     type Kind = cxx::kind::Trivial;
 }
 
@@ -285,6 +273,27 @@ pub mod pinned {
         }
     }
 
+    use crate::cxx_bridge::bar::register_availability_handler_fn_ptr;
+    pub fn register_availability_handler_fn_ptr_safe(
+        application_wrapper: &mut UniquePtr<ApplicationWrapper>,
+        _service: u16,
+        _instance: u16,
+        _fn_ptr_handler: AvailabilityHandlerFnPtr,
+        _major_version: u8,
+        _minor_version: u32
+    ) {
+        unsafe {
+            // Ensure application_wrapper is not null and get a mutable reference
+            let application_wrapper_ptr = application_wrapper.pin_mut().get_self();
+            register_availability_handler_fn_ptr(application_wrapper_ptr, _service, _instance, _fn_ptr_handler, _major_version, _minor_version);
+            // // Pin the mutable reference to ApplicationWrapper
+            // let mut application_pin = Pin::new_unchecked(application_ref);
+            // // Get the raw pointer using get_self
+            // let application_ptr: *mut ApplicationWrapper = application_pin.as_mut().get_self();
+            // let application_ptr = ApplicationWrapper::get_mut(&**application_pin);
+        }
+    }
+
     type AvailabilityHandlerCallback = Box<dyn Fn(service_t, instance_t, bool) + Send + Sync>;
 
     pub struct AvailabilityHandlerCallbackStorage {
@@ -388,10 +397,7 @@ mod tests {
     use crate::ffi::{
         make_application_wrapper, make_message_wrapper, make_payload_wrapper, make_runtime_wrapper,
     };
-    use crate::pinned::{
-        get_data_safe, get_message_payload, get_pinned_application, get_pinned_message_base,
-        get_pinned_payload, get_pinned_runtime, set_data_safe, set_message_payload, upcast,
-    };
+    use crate::pinned::{get_data_safe, get_message_payload, get_pinned_application, get_pinned_message_base, get_pinned_payload, get_pinned_runtime, register_availability_handler_fn_ptr_safe, set_data_safe, set_message_payload, upcast};
     use crate::vsomeip::{message, message_base};
     use crate::{ffi, vsomeip, AvailabilityHandlerFnPtr};
     use cxx::let_cxx_string;
@@ -405,7 +411,7 @@ mod tests {
         let runtime_wrapper = make_runtime_wrapper(my_runtime);
 
         let_cxx_string!(my_app_str = "my_app");
-        let app_wrapper = make_application_wrapper(
+        let mut app_wrapper = make_application_wrapper(
             get_pinned_runtime(&runtime_wrapper).create_application(&my_app_str),
         );
         get_pinned_application(&app_wrapper).init();
@@ -418,7 +424,14 @@ mod tests {
             println!("hello from Rust!");
         }
         let callback = AvailabilityHandlerFnPtr(callback);
-        get_pinned_application(&app_wrapper).register_availability_handler(1, 2, callback, 3, 4);
+        register_availability_handler_fn_ptr_safe(&mut app_wrapper,
+                                                  1,
+                                                  2,
+                                                  callback,
+                                                  3,
+                                                  4,
+        );
+        // get_pinned_application(&app_wrapper).register_availability_handler(1, 2, callback, 3, 4);
         let request =
             make_message_wrapper(get_pinned_runtime(&runtime_wrapper).create_request(true));
 

@@ -925,14 +925,14 @@ void application_impl::unregister_state_handler() {
     handler_ = nullptr;
 }
 
-void application_impl::register_availability_handler(service_t _service,
-        instance_t _instance, availability_handler_fn_ptr _fn_ptr_handler,
-        major_version_t _major, minor_version_t _minor) {
 //void application_impl::register_availability_handler(service_t _service,
-//        instance_t _instance, const availability_handler_t &_handler,
+//        instance_t _instance, availability_handler_fn_ptr _fn_ptr_handler,
 //        major_version_t _major, minor_version_t _minor) {
+void application_impl::register_availability_handler(service_t _service,
+        instance_t _instance, const availability_handler_t &_handler,
+        major_version_t _major, minor_version_t _minor) {
 
-    auto _handler = availability_handler_t(_fn_ptr_handler);
+//    auto _handler = availability_handler_t(_fn_ptr_handler);
 
     std::lock_guard<std::mutex> availability_lock(availability_mutex_);
     auto its_handler_ext = [_handler](service_t _service, instance_t _instance,
